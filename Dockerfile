@@ -18,14 +18,27 @@ RUN pip install --no-cache-dir \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Bake the Bina model into the image
+# ------------------------------------------------------------
+# Bake both models into the image
+# ------------------------------------------------------------
+# 1. Detection model (Segformer)
 ENV HF_HOME=/tmp/hf_cache
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
-ARG BINA_MODEL_ID=Reza2kn/Bina-0.1-Koochik
-RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('${BINA_MODEL_ID}', local_dir='/workspace/models/bina', local_dir_use_symlinks=False)" \
- && rm -rf /tmp/hf_cache
 
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('vikp/surya_detection', local_dir='/root/.cache/surya/detection', local_dir_use_symlinks=False)"
+
+# 2. Recognition model (Bina)
+ARG BINA_MODEL_ID=Reza2kn/Bina-0.1-Koochik
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('${BINA_MODEL_ID}', local_dir='/workspace/models/bina', local_dir_use_symlinks=False)"
+
+# Clean cache to reduce image size
+RUN rm -rf /tmp/hf_cache
+
+# ------------------------------------------------------------
+# Environment variables for runtime
+# ------------------------------------------------------------
 ENV BINA_MODEL_PATH=/workspace/models/bina
+ENV SURYA_DETECTOR_PATH=/root/.cache/surya/detection
 ENV MODEL_DEVICE=auto
 ENV MODEL_DTYPE=bfloat16
 

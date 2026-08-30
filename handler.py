@@ -8,24 +8,18 @@ import runpod
 from PIL import Image
 from pdf2image import convert_from_bytes
 
-# Force Surya to use torch backend (no Docker, no vLLM)
-os.environ.setdefault("SURYA_INFERENCE_BACKEND", "torch")
-os.environ.setdefault("SURYA_MODEL_CHECKPOINT", "/workspace/models/bina")
+from surya.model.detection import segformer
+from surya.model.recognition import vllm
+from surya.ocr import run_ocr
 
-from surya.inference import SuryaInferenceManager
-from surya.recognition import RecognitionPredictor
+MODEL_PATH = os.getenv("BINA_MODEL_PATH", "/workspace/models/bina")
 
-# Lazy-load once
-_MANAGER = None
-_PREDICTOR = None
-
-def _get_predictor():
-    global _MANAGER, _PREDICTOR
-    if _PREDICTOR is not None:
-        return _PREDICTOR
-    _MANAGER = SuryaInferenceManager()
-    _PREDICTOR = RecognitionPredictor(_MANAGER)
-    return _PREDICTOR
+# Load models once (cold start)
+DETECTOR = segformer.load_model()
+RECOGNIZER = vllm.load_model(
+    checkpoint=MODEL_PATH,
+    backend="vllm"          # in-process, no Docker
+)
 
 def _decode_to_images(file_bytes: bytes, dpi: int = 150) -> List[Image.Image]:
     try:
@@ -48,24 +42,22 @@ def handler(job):
     file_bytes = base64.b64decode(b64)
     images = _decode_to_images(file_bytes, dpi=dpi)
 
-    predictor = _get_predictor()
-    predictions = predictor(images)
+    predictions = run_ocr(
+        images,
+        [img.size for img in images],
+        DETECTOR,
+        RECOGNIZER,
+        batch_size=4
+    )
 
     pages = []
     for page_pred in predictions:
         page_lines = []
-        if hasattr(page_pred, "text_lines"):
-            for line in page_pred.text_lines:
-                page_lines.append({
-                    "text": getattr(line, "text", ""),
-                    "bbox": getattr(line, "bbox", None)
-                })
-        else:
-            for block in getattr(page_pred, "blocks", []):
-                page_lines.append({
-                    "text": getattr(block, "text", getattr(block, "html", "")),
-                    "bbox": getattr(block, "bbox", None)
-                })
+        for line in page_pred.text_lines:
+            page_lines.append({
+                "text": line.text,
+                "bbox": line.bbox
+            })
         pages.append(page_lines)
 
     elapsed = time.perf_counter() - t0
