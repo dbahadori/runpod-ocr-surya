@@ -18,8 +18,8 @@ RUN pip install --no-cache-dir \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# --- VERIFICATION ---
-RUN python -c "import surya; print('Surya version:', surya.__version__)"
+# --- VERIFICATION (optional, but safe) ---
+RUN python -c "import surya; print('Surya imported successfully')"
 
 # Bake only the recognition model (Bina)
 ENV HF_HOME=/workspace/hf_cache
