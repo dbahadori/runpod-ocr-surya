@@ -18,10 +18,10 @@ RUN pip install --no-cache-dir \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ------------------------------------------------------------
-# Bake ONLY the recognition model (Bina)
-# Detection model will be downloaded on first run and cached
-# ------------------------------------------------------------
+# --- VERIFICATION ---
+RUN python -c "import surya; print('Surya version:', surya.__version__)"
+
+# Bake only the recognition model (Bina)
 ENV HF_HOME=/workspace/hf_cache
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
 
@@ -29,9 +29,6 @@ ARG BINA_MODEL_ID=Reza2kn/Bina-0.1-Koochik
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('${BINA_MODEL_ID}', local_dir='/workspace/models/bina', local_dir_use_symlinks=False)" \
  && rm -rf /workspace/hf_cache
 
-# ------------------------------------------------------------
-# Environment variables
-# ------------------------------------------------------------
 ENV BINA_MODEL_PATH=/workspace/models/bina
 ENV SURYA_CACHE_DIR=/workspace/surya_cache
 ENV MODEL_DEVICE=auto
